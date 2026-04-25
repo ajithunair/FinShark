@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sql_server
+    platform: linux/amd64
+    environment:
+      - ACCEPT_EULA=1
+      - SA_PASSWORD=MySecure@12345
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+    restart: unless-stopped
+
+volumes:
+  sql_data:
