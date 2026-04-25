@@ -1,21 +1,39 @@
-var builder = WebApplication.CreateBuilder(args);
+using api.Data;
+using Microsoft.EntityFrameworkCore;
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+namespace api;
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+public class Program
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    public static void Main(string[] args)
+    {
+        CreateHostBuilder(args).Build().Run();
+    }
+
+    public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder.ConfigureServices((context, services) =>
+                {
+                    services.AddEndpointsApiExplorer();
+                    services.AddSwaggerGen();
+                    services.AddDbContext<ApplicationContext>(options =>
+                    {
+                        options.UseNpgsql(
+                            context.Configuration.GetConnectionString("PostgreSqlConnectionString"));
+                    });
+                });
+
+                webBuilder.Configure((context, app) =>
+                {
+                    if (context.HostingEnvironment.IsDevelopment())
+                    {
+                        app.UseSwagger();
+                        app.UseSwaggerUI();
+                    }
+
+                    app.UseHttpsRedirection();
+                });
+            });
 }
-
-app.UseHttpsRedirection();
-
-app.Run();
-
-
