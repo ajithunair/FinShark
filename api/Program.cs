@@ -1,39 +1,26 @@
 using api.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace api;
+var builder = WebApplication.CreateBuilder(args);
 
-public class Program
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<ApplicationContext>(options =>
 {
-    public static void Main(string[] args)
-    {
-        CreateHostBuilder(args).Build().Run();
-    }
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("PostgreSqlConnectionString"));
+});
 
-    public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .ConfigureWebHostDefaults(webBuilder =>
-            {
-                webBuilder.ConfigureServices((context, services) =>
-                {
-                    services.AddEndpointsApiExplorer();
-                    services.AddSwaggerGen();
-                    services.AddDbContext<ApplicationContext>(options =>
-                    {
-                        options.UseNpgsql(
-                            context.Configuration.GetConnectionString("PostgreSqlConnectionString"));
-                    });
-                });
+var app = builder.Build();
 
-                webBuilder.Configure((context, app) =>
-                {
-                    if (context.HostingEnvironment.IsDevelopment())
-                    {
-                        app.UseSwagger();
-                        app.UseSwaggerUI();
-                    }
-
-                    app.UseHttpsRedirection();
-                });
-            });
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseHttpsRedirection();
+app.MapControllers();
+
+app.Run();
