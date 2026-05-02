@@ -53,7 +53,14 @@ namespace api.Repository
                 stocks = stocks.Where(s => s.CompanyName.Contains(query.CompanyName));
             }
 
-            return await stocks.ToListAsync();
+            if (!string.IsNullOrWhiteSpace(query.SortBy))
+            {
+                stocks = query.IsDescending ? stocks.OrderByDescending(s => s.Symbol) : stocks.OrderBy(s => s.Symbol);
+            }
+
+            var skipNumber = (query.PageNumber - 1) * query.PageSize;
+
+            return await stocks.Skip(skipNumber).Take(query.PageSize).ToListAsync();
         }
 
         public async Task<Stock?> GetByIdAsync(int id)
