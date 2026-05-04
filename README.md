@@ -8,3 +8,6 @@ Complete WebApi
 6. Repository Pattern
 7. 1-To-Many relation
 8. Data validation
+9. Filtering & Sorting
+10. Pagination
+11. Identity & User Registration
