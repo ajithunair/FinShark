@@ -38,6 +38,19 @@ textarea {
   gap: 12px;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .form-grid input,
 .form-grid textarea,
 .filter-row input {
@@ -114,5 +127,10 @@ textarea {
 
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

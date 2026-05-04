@@ -6,6 +6,15 @@ const emptyRegisterForm = {
   password: "",
 };
 
+const emptyStockForm = {
+  symbol: "",
+  companyName: "",
+  purchase: "",
+  lastDiv: "",
+  industry: "",
+  marketCap: "",
+};
+
 const emptyCommentForm = {
   title: "",
   content: "",
@@ -14,6 +23,28 @@ const emptyCommentForm = {
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleString();
+}
+
+function mapStockToForm(stock) {
+  return {
+    symbol: stock.symbol ?? "",
+    companyName: stock.companyName ?? "",
+    purchase: String(stock.purchase ?? ""),
+    lastDiv: String(stock.lastDiv ?? ""),
+    industry: stock.industry ?? "",
+    marketCap: String(stock.marketCap ?? ""),
+  };
+}
+
+function mapStockFormToPayload(stockForm) {
+  return {
+    symbol: stockForm.symbol.trim(),
+    companyName: stockForm.companyName.trim(),
+    purchase: Number(stockForm.purchase),
+    lastDiv: Number(stockForm.lastDiv),
+    industry: stockForm.industry.trim(),
+    marketCap: Number(stockForm.marketCap),
+  };
 }
 
 async function readErrorMessage(response) {
@@ -32,7 +63,7 @@ async function readErrorMessage(response) {
 
 export default function App() {
   const [stocks, setStocks] = useState([]);
-  const [selectedStock, setSelectedStock] = useState(null);
+  const [selectedStockId, setSelectedStockId] = useState(null);
   const [filters, setFilters] = useState({ symbol: "", companyName: "" });
   const [loadingStocks, setLoadingStocks] = useState(false);
   const [stockError, setStockError] = useState("");
@@ -41,20 +72,19 @@ export default function App() {
   const [registerStatus, setRegisterStatus] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
 
+  const [stockForm, setStockForm] = useState(emptyStockForm);
+  const [stockStatus, setStockStatus] = useState("");
+  const [stockLoading, setStockLoading] = useState(false);
+  const [editingStockId, setEditingStockId] = useState(null);
+
   const [commentForm, setCommentForm] = useState(emptyCommentForm);
   const [commentStatus, setCommentStatus] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState(null);
 
-  function appendCommentToStock(stock, createdComment) {
-    if (!stock) return stock;
+  const selectedStock = stocks.find((stock) => stock.id === selectedStockId) ?? null;
 
-    return {
-      ...stock,
-      comments: [...(stock.comments ?? []), createdComment],
-    };
-  }
-
-  async function loadStocks(nextFilters = filters) {
+  async function loadStocks(nextFilters = filters, preferredStockId = null) {
     setLoadingStocks(true);
     setStockError("");
 
@@ -74,14 +104,18 @@ export default function App() {
 
       const data = await response.json();
       setStocks(data);
-      setSelectedStock((current) => {
-        if (!current) return data[0] ?? null;
-        return data.find((stock) => stock.id === current.id) ?? data[0] ?? null;
+      setSelectedStockId((currentId) => {
+        const nextSelectedId = preferredStockId ?? currentId;
+        if (nextSelectedId && data.some((stock) => stock.id === nextSelectedId)) {
+          return nextSelectedId;
+        }
+
+        return data[0]?.id ?? null;
       });
     } catch (error) {
       setStockError(error.message);
       setStocks([]);
-      setSelectedStock(null);
+      setSelectedStockId(null);
     } finally {
       setLoadingStocks(false);
     }
@@ -90,6 +124,16 @@ export default function App() {
   useEffect(() => {
     loadStocks();
   }, []);
+
+  function resetStockEditor() {
+    setEditingStockId(null);
+    setStockForm(emptyStockForm);
+  }
+
+  function resetCommentEditor() {
+    setEditingCommentId(null);
+    setCommentForm(emptyCommentForm);
+  }
 
   async function handleRegisterSubmit(event) {
     event.preventDefault();
@@ -119,6 +163,71 @@ export default function App() {
     }
   }
 
+  async function handleStockSubmit(event) {
+    event.preventDefault();
+    setStockLoading(true);
+    setStockStatus("");
+
+    try {
+      const response = await fetch(
+        editingStockId ? `/api/stock/${editingStockId}` : "/api/stock",
+        {
+          method: editingStockId ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(mapStockFormToPayload(stockForm)),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      const savedStock = await response.json();
+      await loadStocks(filters, savedStock.id);
+      setStockStatus(editingStockId ? "Stock updated." : "Stock created.");
+      resetStockEditor();
+    } catch (error) {
+      setStockStatus(error.message);
+    } finally {
+      setStockLoading(false);
+    }
+  }
+
+  async function handleDeleteStock() {
+    if (!selectedStock) {
+      setStockStatus("Select a stock first.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${selectedStock.symbol}?`)) {
+      return;
+    }
+
+    setStockLoading(true);
+    setStockStatus("");
+
+    try {
+      const response = await fetch(`/api/stock/${selectedStock.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      await loadStocks(filters);
+      setStockStatus("Stock deleted.");
+      resetStockEditor();
+      resetCommentEditor();
+    } catch (error) {
+      setStockStatus(error.message);
+    } finally {
+      setStockLoading(false);
+    }
+  }
+
   async function handleCommentSubmit(event) {
     event.preventDefault();
 
@@ -131,27 +240,59 @@ export default function App() {
     setCommentStatus("");
 
     try {
-      const response = await fetch(`/api/comment/${selectedStock.id}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(commentForm),
+      const response = await fetch(
+        editingCommentId ? `/api/comment/${editingCommentId}` : `/api/comment/${selectedStock.id}`,
+        {
+          method: editingCommentId ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(commentForm),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      await loadStocks(filters, selectedStock.id);
+      setCommentStatus(editingCommentId ? "Comment updated." : "Comment added.");
+      resetCommentEditor();
+    } catch (error) {
+      setCommentStatus(error.message);
+    } finally {
+      setCommentLoading(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    if (!selectedStock) {
+      setCommentStatus("Select a stock first.");
+      return;
+    }
+
+    if (!window.confirm("Delete this comment?")) {
+      return;
+    }
+
+    setCommentLoading(true);
+    setCommentStatus("");
+
+    try {
+      const response = await fetch(`/api/comment/${commentId}`, {
+        method: "DELETE",
       });
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
       }
 
-      const createdComment = await response.json();
-      setStocks((current) =>
-        current.map((stock) =>
-          stock.id === selectedStock.id ? appendCommentToStock(stock, createdComment) : stock
-        )
-      );
-      setSelectedStock((current) => appendCommentToStock(current, createdComment));
-      setCommentForm(emptyCommentForm);
-      setCommentStatus("Comment added.");
+      await loadStocks(filters, selectedStock.id);
+      setCommentStatus("Comment deleted.");
+
+      if (editingCommentId === commentId) {
+        resetCommentEditor();
+      }
     } catch (error) {
       setCommentStatus(error.message);
     } finally {
@@ -175,12 +316,40 @@ export default function App() {
     }));
   }
 
+  function handleStockChange(event) {
+    const { name, value } = event.target;
+    setStockForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  }
+
   function handleCommentChange(event) {
     const { name, value } = event.target;
     setCommentForm((current) => ({
       ...current,
       [name]: value,
     }));
+  }
+
+  function startEditStock() {
+    if (!selectedStock) {
+      setStockStatus("Select a stock first.");
+      return;
+    }
+
+    setEditingStockId(selectedStock.id);
+    setStockForm(mapStockToForm(selectedStock));
+    setStockStatus("");
+  }
+
+  function startEditComment(comment) {
+    setEditingCommentId(comment.id);
+    setCommentForm({
+      title: comment.title,
+      content: comment.content,
+    });
+    setCommentStatus("");
   }
 
   return (
@@ -221,6 +390,69 @@ export default function App() {
       </section>
 
       <section className="panel">
+        <h2>{editingStockId ? "Edit Stock" : "Add Stock"}</h2>
+        <form className="form-grid" onSubmit={handleStockSubmit}>
+          <input
+            name="symbol"
+            placeholder="Symbol"
+            value={stockForm.symbol}
+            onChange={handleStockChange}
+          />
+          <input
+            name="companyName"
+            placeholder="Company name"
+            value={stockForm.companyName}
+            onChange={handleStockChange}
+          />
+          <input
+            name="industry"
+            placeholder="Industry"
+            value={stockForm.industry}
+            onChange={handleStockChange}
+          />
+          <input
+            name="purchase"
+            type="number"
+            step="0.01"
+            placeholder="Purchase"
+            value={stockForm.purchase}
+            onChange={handleStockChange}
+          />
+          <input
+            name="lastDiv"
+            type="number"
+            step="0.01"
+            placeholder="Last dividend"
+            value={stockForm.lastDiv}
+            onChange={handleStockChange}
+          />
+          <input
+            name="marketCap"
+            type="number"
+            step="1"
+            placeholder="Market cap"
+            value={stockForm.marketCap}
+            onChange={handleStockChange}
+          />
+          <div className="button-row">
+            <button type="submit" disabled={stockLoading}>
+              {stockLoading ? "Saving..." : editingStockId ? "Update Stock" : "Create Stock"}
+            </button>
+            <button type="button" onClick={resetStockEditor}>
+              Clear
+            </button>
+            <button type="button" onClick={startEditStock}>
+              Load Selected
+            </button>
+            <button type="button" onClick={handleDeleteStock}>
+              Delete Selected
+            </button>
+          </div>
+        </form>
+        {stockStatus ? <p className="status">{stockStatus}</p> : null}
+      </section>
+
+      <section className="panel">
         <h2>Stocks</h2>
         <form
           className="filter-row"
@@ -256,8 +488,11 @@ export default function App() {
                 <li key={stock.id}>
                   <button
                     type="button"
-                    className={selectedStock?.id === stock.id ? "active" : ""}
-                    onClick={() => setSelectedStock(stock)}
+                    className={selectedStockId === stock.id ? "active" : ""}
+                    onClick={() => {
+                      setSelectedStockId(stock.id);
+                      setCommentStatus("");
+                    }}
                   >
                     <strong>{stock.symbol}</strong>
                     <span>{stock.companyName}</span>
@@ -281,18 +516,33 @@ export default function App() {
                   <p><strong>Market Cap:</strong> {selectedStock.marketCap}</p>
                 </div>
 
-                <h4>Comments</h4>
+                <div className="section-header">
+                  <h4>Comments</h4>
+                  <button type="button" onClick={resetCommentEditor}>
+                    New Comment
+                  </button>
+                </div>
+
                 <ul className="comment-list">
                   {(selectedStock.comments ?? []).map((comment) => (
                     <li key={comment.id}>
                       <strong>{comment.title}</strong>
                       <p>{comment.content}</p>
                       <small>{formatDate(comment.createdOn)}</small>
+                      <div className="button-row">
+                        <button type="button" onClick={() => startEditComment(comment)}>
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => handleDeleteComment(comment.id)}>
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
                 {(selectedStock.comments ?? []).length === 0 ? <p>No comments yet.</p> : null}
 
+                <h4>{editingCommentId ? "Edit Comment" : "Add Comment"}</h4>
                 <form className="form-grid" onSubmit={handleCommentSubmit}>
                   <input
                     name="title"
@@ -307,9 +557,14 @@ export default function App() {
                     value={commentForm.content}
                     onChange={handleCommentChange}
                   />
-                  <button type="submit" disabled={commentLoading}>
-                    {commentLoading ? "Saving..." : "Add Comment"}
-                  </button>
+                  <div className="button-row">
+                    <button type="submit" disabled={commentLoading}>
+                      {commentLoading ? "Saving..." : editingCommentId ? "Update Comment" : "Add Comment"}
+                    </button>
+                    <button type="button" onClick={resetCommentEditor}>
+                      Clear
+                    </button>
+                  </div>
                 </form>
                 {commentStatus ? <p className="status">{commentStatus}</p> : null}
               </>
