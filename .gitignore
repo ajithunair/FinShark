@@ -4,5 +4,9 @@ obj/
 *.user
 *.log
 .env
-
 .fake
+.DS_Store
+node_modules/
+dist/
+.vite/
+coverage/
