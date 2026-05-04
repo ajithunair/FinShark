@@ -45,6 +45,15 @@ export default function App() {
   const [commentStatus, setCommentStatus] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
 
+  function appendCommentToStock(stock, createdComment) {
+    if (!stock) return stock;
+
+    return {
+      ...stock,
+      comments: [...(stock.comments ?? []), createdComment],
+    };
+  }
+
   async function loadStocks(nextFilters = filters) {
     setLoadingStocks(true);
     setStockError("");
@@ -135,14 +144,12 @@ export default function App() {
       }
 
       const createdComment = await response.json();
-      setSelectedStock((current) =>
-        current
-          ? {
-              ...current,
-              comments: [...(current.comments ?? []), createdComment],
-            }
-          : current
+      setStocks((current) =>
+        current.map((stock) =>
+          stock.id === selectedStock.id ? appendCommentToStock(stock, createdComment) : stock
+        )
       );
+      setSelectedStock((current) => appendCommentToStock(current, createdComment));
       setCommentForm(emptyCommentForm);
       setCommentStatus("Comment added.");
     } catch (error) {
