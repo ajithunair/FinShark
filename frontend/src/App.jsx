@@ -91,6 +91,10 @@ async function readErrorMessage(response) {
   }
 
   const text = await response.text();
+  if (!text && response.status === 401) {
+    return "Unauthorized. Please log in again.";
+  }
+
   return text || "Something went wrong.";
 }
 
@@ -147,6 +151,27 @@ export default function App() {
     setErrorBanner(message || "Something went wrong.");
   }
 
+  async function fetchWithAuth(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+
+    if (session?.token) {
+      headers.set("Authorization", `Bearer ${session.token}`);
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      setSession(null);
+      setActiveView("login");
+      setLoginStatus("Your session expired. Please log in again.");
+    }
+
+    return response;
+  }
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -170,7 +195,7 @@ export default function App() {
       }
 
       const url = params.toString() ? `/api/stock?${params.toString()}` : "/api/stock";
-      const response = await fetch(url);
+      const response = await fetchWithAuth(url);
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
@@ -283,7 +308,7 @@ export default function App() {
     clearErrorBanner();
 
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         editingStockId ? `/api/stock/${editingStockId}` : "/api/stock",
         {
           method: editingStockId ? "PUT" : "POST",
@@ -324,7 +349,7 @@ export default function App() {
     clearErrorBanner();
 
     try {
-      const response = await fetch(`/api/stock/${selectedStock.id}`, {
+      const response = await fetchWithAuth(`/api/stock/${selectedStock.id}`, {
         method: "DELETE",
       });
 
@@ -356,7 +381,7 @@ export default function App() {
     clearErrorBanner();
 
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         editingCommentId ? `/api/comment/${editingCommentId}` : `/api/comment/${selectedStock.id}`,
         {
           method: editingCommentId ? "PUT" : "POST",
@@ -396,7 +421,7 @@ export default function App() {
     clearErrorBanner();
 
     try {
-      const response = await fetch(`/api/comment/${commentId}`, {
+      const response = await fetchWithAuth(`/api/comment/${commentId}`, {
         method: "DELETE",
       });
 

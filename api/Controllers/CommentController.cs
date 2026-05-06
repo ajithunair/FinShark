@@ -6,6 +6,7 @@ using api.DTOs.Comment;
 using api.Interfaces;
 using api.Mappers;
 using api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers
@@ -22,7 +23,7 @@ namespace api.Controllers
             _stockRepo = stockRepo;
         }
 
-
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -35,6 +36,7 @@ namespace api.Controllers
             return Ok(commentDto);
         }
 
+        [Authorize]
         [HttpGet]
         [Route("{id:int}")]
         public async Task<IActionResult> GetById([FromRoute] int id)
@@ -51,6 +53,7 @@ namespace api.Controllers
             return Ok(comment.ToCommentDto());
         }
 
+        [Authorize]
         [HttpPost("{stockId:int}")]
         public async Task<IActionResult> Create([FromRoute] int stockId, CreateCommentDto commentDto)
         {
@@ -67,6 +70,7 @@ namespace api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = commentModel.Id }, commentModel.ToCommentDto());
         }
 
+        [Authorize]
         [HttpPut]
         [Route("{id:int}")]
         public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdateCommentRequestDto updateDto)
@@ -82,6 +86,7 @@ namespace api.Controllers
             return Ok(comment.ToCommentDto());
         }
 
+        [Authorize]
         [HttpDelete]
         [Route("{id:int}")]
         public async Task<IActionResult> Delete([FromRoute] int id)

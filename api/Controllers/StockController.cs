@@ -8,6 +8,7 @@ using api.Interfaces;
 using api.Mappers;
 using api.Models;
 using DTOs.Stock;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,7 @@ namespace api.Controllers
             _stockRepository = stockRepository;
         }
 
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] QueryObject query)
         {
@@ -37,6 +39,7 @@ namespace api.Controllers
             return Ok(stockDto);
         }
 
+        [Authorize]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById([FromRoute] int id)
         {
@@ -52,6 +55,7 @@ namespace api.Controllers
             return Ok(stock.ToStockDto());
         }
 
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateStockRequestDto stockDto)
         {
@@ -63,6 +67,7 @@ namespace api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = stockModel.Id }, stockModel.ToStockDto());
         }
 
+        [Authorize]
         [HttpPut]
         [Route("{id:int}")]
         public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UpdateStockRequestDto updateDto)
@@ -79,6 +84,7 @@ namespace api.Controllers
             return Ok(stockModel.ToStockDto());
         }
 
+        [Authorize]
         [HttpDelete]
         [Route("{id}")]
         public async Task<IActionResult> Delete([FromRoute] int id)
